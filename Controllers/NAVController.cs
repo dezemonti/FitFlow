@@ -1,8 +1,17 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using FitFlow.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RestSharp;
+using RestSharp.Serializers.Xml;
 using System.Diagnostics;
 using System.Reflection.PortableExecutable;
+using System.Text.RegularExpressions;
+using System.Xml.Serialization;
+using Microsoft.Extensions.Configuration;
+using System.Drawing.Text;
+using System.Configuration;
 
 namespace FitFlow.Controllers
 {
@@ -10,43 +19,65 @@ namespace FitFlow.Controllers
     [Route("[controller]")]
     public class NAVController : Controller
     {
+        private IConfiguration configuration;
+
+        public NAVController(IConfiguration iConfig)
+        {
+            configuration = iConfig;
+        }
+
         // POST: NAV/GetProducts
         [HttpPost]
         [Route("GetProducts")]
         public IActionResult GetProducts(string productNumber)
         {
-            var clientProduct = new RestClient("http://20.25.122.85:14057/");
-            var requestProduct = new RestRequest("FitflowWS/WS/Fitflow/Codeunit/CRMIntegrations/GetStock", Method.Post);
+            RestClient clientProduct = new RestClient("https://navdev.fitflow.com:7047/");
+            RestRequest requestProduct = new RestRequest("DynamicsNAV71/WS/Fitflow/Codeunit/CRMIntegrations", Method.Post);
+            string key = configuration.GetSection("AppSettings").GetSection("NAV").Value;
 
-            string bodyRequestProduct = 
-                $"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:crm=\"urn:microsoft-dynamics-schemas/codeunit/CRMIntegrations\" xmlns:x50=\"urn:microsoft-dynamics-nav/xmlports/x50015\" xmlns:x501=\"urn:microsoft-dynamics-nav/xmlports/x50016\">\r\n" +
-                $"   <soapenv:Header />\r\n" +
-                $"   <soapenv:Body>\r\n" +
-                $"      <crm:GetStock>\r\n" +
-                $"         <crm:itemNo>{productNumber}</crm:itemNo>\r\n" +
-                $"         <crm:cRMResponse>\r\n" +
-                $"            e\r\n" +
-                $"            <!--1 or more repetitions:-->\r\n" +
-                $"            <x50:Item>\r\n" +
-                $"               <x50:ItemNo>?</x50:ItemNo>\r\n" +
-                $"               <x50:Description>?</x50:Description>\r\n" +
-                $"               <x50:Stock>?</x50:Stock>\r\n" +
-                $"            </x50:Item>\r\n" +
-                $"            gero\r\n" +
-                $"         </crm:cRMResponse>\r\n" +
-                $"      </crm:GetStock>\r\n" +
-                $"   </soapenv:Body>\r\n" +
-                $"</soapenv:Envelope>";
+            string bodyRequestProduct =
+            $"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:crm=\"urn:microsoft-dynamics-schemas/codeunit/CRMIntegrations\" xmlns:x50=\"urn:microsoft-dynamics-nav/xmlports/x50015\" xmlns:x501=\"urn:microsoft-dynamics-nav/xmlports/x50016\">\r\n" +
+            $"   <soapenv:Header />\r\n" +
+            $"   <soapenv:Body>\r\n" +
+            $"      <crm:GetStock>\r\n" +
+            $"         <crm:itemNo>{productNumber}</crm:itemNo>\r\n" +
+            $"         <crm:cRMResponse>\r\n" +
+            $"            e\r\n" +
+            $"            <!--1 or more repetitions:-->\r\n" +
+            $"            <x50:Item>\r\n" +
+            $"               <x50:ItemNo>?</x50:ItemNo>\r\n" +
+            $"               <x50:Description>?</x50:Description>\r\n" +
+            $"               <x50:Stock>?</x50:Stock>\r\n" +
+            $"            </x50:Item>\r\n" +
+            $"            gero\r\n" +
+            $"         </crm:cRMResponse>\r\n" +
+            $"      </crm:GetStock>\r\n" +
+            $"   </soapenv:Body>\r\n" +
+            $"</soapenv:Envelope>";
 
+            requestProduct.Timeout = -1;
             requestProduct.AddXmlBody(bodyRequestProduct);
-            //requestProduct.AddHeader("usuario", "fitflowperu");
-            //requestProduct.AddHeader("clave", "F1tflow2021*.");
-            requestProduct.AddParameter("usuario", "fitflowperu");
-            requestProduct.AddParameter("clave", "F1tflow2021*.");
+            requestProduct.AddHeader("Authorization", $"Basic {key}");
+            requestProduct.AddHeader("SOAPAction", "");
+            requestProduct.AddHeader("Content-Type", "application/xml");
 
-            var productStock = clientProduct.Execute(requestProduct);
-            
-            return Ok(productStock);
+            RestResponse productStock = clientProduct.Execute(requestProduct);
+
+            Regex regexItem = new Regex("<ItemNo>(.*)</ItemNo>");
+            Regex regexDescription = new Regex("<Description>(.*)</Description>");
+            Regex regexStock = new Regex("<Stock>(.*)</Stock>");
+            var item = regexItem.Match(productStock.Content);
+            var description = regexDescription.Match(productStock.Content);
+            var stock = regexStock.Match(productStock.Content);
+
+            Product product = new Product();
+            product.ItemNumber = item.Groups[1].ToString();
+            product.Description = description.Groups[1].ToString();
+            product.Stock = Convert.ToInt32(stock.Groups[1].ToString());
+
+            string json = JsonConvert.SerializeObject(product);
+
+            return Ok(json);
         }
 
         // POST: NAV/GetProducts
@@ -54,8 +85,9 @@ namespace FitFlow.Controllers
         [Route("GetCreditLimit")]
         public IActionResult GetCreditLimit(string clientCode)
         {
-            var clientCreditLimit = new RestClient("http://20.25.122.85:14057/");
-            var requestCreditLimit = new RestRequest("FitflowWS/WS/Fitflow/Codeunit/CRMIntegrations/GetCreditLimit", Method.Post);
+            var clientCreditLimit = new RestClient("https://navdev.fitflow.com:7047/");
+            var requestCreditLimit = new RestRequest("DynamicsNAV71/WS/Fitflow/Codeunit/CRMIntegrations", Method.Post);
+            string key = configuration.GetSection("AppSettings").GetSection("NAV").Value;
 
             string bodyRequestCreditLimit =
                 $"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:crm=\"urn:microsoft-dynamics-schemas/codeunit/CRMIntegrations\" xmlns:x50=\"urn:microsoft-dynamics-nav/xmlports/x50015\" xmlns:x501=\"urn:microsoft-dynamics-nav/xmlports/x50016\">\r\n" +
@@ -77,10 +109,29 @@ namespace FitFlow.Controllers
                 $"   </soapenv:Body>\r\n" +
                 $"</soapenv:Envelope>";
 
+            requestCreditLimit.Timeout = -1;
             requestCreditLimit.AddXmlBody(bodyRequestCreditLimit);
-            var creditLimit = clientCreditLimit.Execute(requestCreditLimit);
+            requestCreditLimit.AddHeader("Authorization", $"Basic {key}");
+            requestCreditLimit.AddHeader("SOAPAction", "");
+            requestCreditLimit.AddHeader("Content-Type", "application/xml");
 
-            return Ok(creditLimit);
+            RestResponse creditLimit = clientCreditLimit.Execute(requestCreditLimit);
+
+            Regex regexCustNo = new Regex("<CustNo>(.*)</CustNo>");
+            Regex regexName = new Regex("<Name>(.*)</Name>");
+            Regex regexCreditLimit = new Regex("<CreditLimit>(.*)</CreditLimit>");
+            var custno = regexCustNo.Match(creditLimit.Content);
+            var name = regexName.Match(creditLimit.Content);
+            var limit = regexCreditLimit.Match(creditLimit.Content);
+
+            Customer customer = new Customer();
+            customer.CustNo = custno.Groups[1].ToString();
+            customer.CustName = name.Groups[1].ToString();
+            customer.CreditLimit = limit.Groups[1].ToString();
+
+            string json = JsonConvert.SerializeObject(customer);
+
+            return Ok(json);
         }
 
         // POST: NAV/GetProducts

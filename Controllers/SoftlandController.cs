@@ -8,6 +8,7 @@ using Microsoft.Xrm.Sdk.Query;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 using System;
+using System.Configuration;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
@@ -18,18 +19,39 @@ namespace FitFlow.Controllers
     [Route("[controller]")]
     public class SoftlandController : Controller
     {
+        private IConfiguration configuration;
+
+        public SoftlandController(IConfiguration iConfig)
+        {
+            configuration = iConfig;
+        }
+        private string GetToken()
+        {
+            var clientToken = new RestClient("https://api.fitflow.com/");
+            var requestToken = new RestRequest("login/obtener-token", Method.Post);
+            string user = configuration.GetSection("AppSettings").GetSection("Softland").GetSection("user").Value;
+            string key = configuration.GetSection("AppSettings").GetSection("Softland").GetSection("password").Value;
+            requestToken.AddJsonBody(new { username = user, password = key });
+            var tokenResult = clientToken.Execute(requestToken);
+
+            var token = tokenResult?.Content;
+            return token;
+        }
+
         // POST: Softland/GetProducts
         [HttpPost]
         [Route("GetProducts")]
         public IActionResult GetProducts()
         {
-            var clientToken = new RestClient("http://186.67.224.61:8065/");
+            var clientToken = new RestClient("https://api.fitflow.com/");
             var requestToken = new RestRequest("login/obtener-token", Method.Post);
-            requestToken.AddJsonBody(new { username = "admin", password = "1234" });
+            string user = configuration.GetSection("AppSettings").GetSection("Softland").GetSection("user").Value;
+            string key = configuration.GetSection("AppSettings").GetSection("Softland").GetSection("password").Value;
+            requestToken.AddJsonBody(new { username = user, password = key });
             var tokenResult = clientToken.Execute(requestToken);
 
-            var token = tokenResult?.Content;
-            var clientProducts = new RestClient("http://186.67.224.61:8065/");
+            var token = GetToken();
+            var clientProducts = new RestClient("https://api.fitflow.com/");
             var requestProducts = new RestRequest("softland/lista-productos", Method.Post);
 
             requestProducts.AddJsonBody(new {
@@ -47,13 +69,8 @@ namespace FitFlow.Controllers
         [Route("GetProducts/{code}")]
         public IActionResult GetProducts(string code)
         {
-            var clientToken = new RestClient("http://186.67.224.61:8065/");
-            var requestToken = new RestRequest("login/obtener-token", Method.Post);
-            requestToken.AddJsonBody(new { username = "admin", password = "1234" });
-            var tokenResult = clientToken.Execute(requestToken);
-
-            var token = tokenResult?.Content;
-            var clientProducts = new RestClient("http://186.67.224.61:8065/");
+            var token = GetToken();
+            var clientProducts = new RestClient("https://api.fitflow.com/");
             var requestProducts = new RestRequest("softland/lista-productos", Method.Post);
 
             requestProducts.AddJsonBody(new { 
@@ -81,13 +98,8 @@ namespace FitFlow.Controllers
         [Route("SendSaleOrder/{code}")]
         public IActionResult SendSaleOrder(string code)
         {
-            var clientToken = new RestClient("http://186.67.224.61:8065/");
-            var requestToken = new RestRequest("login/obtener-token", Method.Post);
-            requestToken.AddJsonBody(new { username = "admin", password = "1234" });
-            var tokenResult = clientToken.Execute(requestToken);
-
-            var token = tokenResult?.Content;
-            var clientProducts = new RestClient("http://186.67.224.61:8065/");
+            var token = GetToken();
+            var clientProducts = new RestClient("https://api.fitflow.com/");
             var requestProducts = new RestRequest("softland/inserta-nota-venta", Method.Post);
 
             requestProducts.AddJsonBody(new { 
@@ -133,13 +145,8 @@ namespace FitFlow.Controllers
         [Route("GetOrderStatus/{orderNumber}")]
         public IActionResult GetOrderStatus(string orderNumber)
         {
-            var clientToken = new RestClient("http://186.67.224.61:8065/");
-            var requestToken = new RestRequest("login/obtener-token", Method.Post);
-            requestToken.AddJsonBody(new { username = "admin", password = "1234" });
-            var tokenResult = clientToken.Execute(requestToken);
-
-            var token = tokenResult?.Content;
-            var clientOrderStatus = new RestClient("http://186.67.224.61:8065/");
+            var token = GetToken();
+            var clientOrderStatus = new RestClient("https://api.fitflow.com/");
             var requestOrderStatus = new RestRequest("softland/estado-nota-pedido", Method.Post);
 
             requestOrderStatus.AddJsonBody(new {
@@ -158,13 +165,8 @@ namespace FitFlow.Controllers
         [Route("GetCreditStatus/{rut}")]
         public IActionResult GetCreditStatus(string rut)
         {
-            var clientToken = new RestClient("http://186.67.224.61:8065/");
-            var requestToken = new RestRequest("login/obtener-token", Method.Post);
-            requestToken.AddJsonBody(new { username = "admin", password = "1234" });
-            var tokenResult = clientToken.Execute(requestToken);
-
-            var token = tokenResult?.Content;
-            var clientCreditStatus = new RestClient("http://186.67.224.61:8065/");
+            var token = GetToken();
+            var clientCreditStatus = new RestClient("https://api.fitflow.com/");
             var requestCreditStatus = new RestRequest("softland/cuenta-corriente", Method.Post);
 
             requestCreditStatus.AddJsonBody(new
